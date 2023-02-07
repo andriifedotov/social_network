@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
@@ -53,6 +54,9 @@ class LoginSerializer(serializers.Serializer):
                 'A user with this email and password was not found.'
             )
 
+        user.last_login = timezone.now()
+        user.save()
+        
         return {
             'email': user.email,
             'username': user.username,
