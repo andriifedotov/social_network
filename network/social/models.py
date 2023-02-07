@@ -50,6 +50,7 @@ class User(AbstractBaseUser):
     
     email = models.EmailField(verbose_name='email', max_length=60, unique=True)
     username = models.CharField(verbose_name='username', max_length=60, db_index=True)
+    last_request = models.DateTimeField(null=True, blank=True)
 
     REQUIRED_FIELDS = ['username']
     USERNAME_FIELD = 'email'
