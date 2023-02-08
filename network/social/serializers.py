@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
-from .models import User
+from .models import User, Post, Like
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -74,8 +74,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'username', 'password', 'token', 'last_login', 'last_request')
-        read_only_fields = ('token', 'last_login', 'last_request')
+        fields = ['email', 'username', 'password', 'token', 'last_login', 'last_request']
+        read_only_fields = ['token', 'last_login', 'last_request']
 
     def update(self, instance, validated_data):
 
@@ -90,3 +90,24 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['id', 'user', 'title', 'content', 'created_at', 'updated_at']
+        read_only_fields = ['user']
+
+
+class LikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Like
+        fields = ('id', 'user', 'post', 'created_at')
+        read_only_fields = ('id', 'user', 'post', 'created_at')
+    
+    def validate(self, data):
+        
+        if Like.objects.filter(user=self.initial_data.get('user')).exists():
+            raise serializers.ValidationError("User can like post once")
+        return data
+    
