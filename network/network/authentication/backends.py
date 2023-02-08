@@ -17,9 +17,6 @@ class JWTAuthentication(authentication.BaseAuthentication):
         auth_header = authentication.get_authorization_header(request).split()
         auth_header_prefix = self.authentication_header_prefix.lower()
 
-        print(auth_header)
-
-
         if not auth_header:
             return None
 

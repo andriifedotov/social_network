@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView, ListAPIView
@@ -6,10 +7,14 @@ from rest_framework.views import APIView
 from rest_framework import viewsets
 
 from django.shortcuts import get_object_or_404
+from django.db.models import Count, DateField
+from django.db.models import F 
 
-from .serializers import LoginSerializer, RegistrationSerializer, UserSerializer, PostSerializer, LikeSerializer
+from .serializers import (LoginSerializer, RegistrationSerializer, UserSerializer, PostSerializer, 
+                            LikeSerializer, AnalyticsSerializer, ActivitySerializer)
+
 from .renderers import UserJSONRenderer
-from .models import Post, Like
+from .models import Post, Like, User
 
 class RegistrationAPIView(APIView):
    
@@ -69,8 +74,9 @@ class UserRetrieveUpdateAPIView(RetrieveUpdateAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-
 class PostViewSet(viewsets.ModelViewSet):
+
+    permission_classes = (IsAuthenticated,)
     queryset = Post.objects.all()
     serializer_class = PostSerializer
 
@@ -79,23 +85,29 @@ class PostViewSet(viewsets.ModelViewSet):
 
 
 class LikeViewSet(viewsets.ModelViewSet):
+
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
+    permission_classes = (IsAuthenticated,)
 
-    def perform_create(self, post_id, serializer):
-            serializer.save(user=self.request.user, post=post_id)
+    def perform_create(self, serializer):
+        
+        serializer.save(user=self.request.user)
     
     def create(self, request, post_id, *args, **kwargs):
         
-        post = Post.objects.get(id=post_id)
+        try:
+            post = Post.objects.get(id=post_id)
+
+        except:
+            return Response({"errors":{"error": f"Couldn't find post with this id: {post_id}"}}, status=status.HTTP_400_BAD_REQUEST)
         
-        user = request.user
-        data = {"user": user,"post": post_id}
+        data = {"post": post.pk}
 
-        serializer = self.serializer_class(data=data)
-
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+
+        serializer.save(user=self.request.user)
 
         post.likes_count+=1
         post.save()
@@ -104,14 +116,61 @@ class LikeViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, post_id, *args, **kwargs):
 
-        like = get_object_or_404(Like, post=post_id)
+        user = request.user
+
+        like = get_object_or_404(Like, post=post_id, user=user)
         like.delete()
 
         post = Post.objects.get(id=post_id)
         post.likes_count-=1
         post.save()
+        
         return Response(status=status.HTTP_204_NO_CONTENT) 
 
 
+class AnalyticsViewSet(viewsets.ViewSet):
+    
+    permission_classes = (IsAuthenticated,)
+    serializer_class = AnalyticsSerializer
+    
+    def list(self, request):
 
+        date_from = self.request.query_params.get('date_from', None)
+        date_to = self.request.query_params.get('date_to', None)
+
+        if date_from is None or date_to is None:
+            return Response({"errors":{"error": "date_from and date_to parameters are required."}}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            date_from = datetime.strptime(date_from, '%Y-%m-%d')
+            date_to = datetime.strptime(date_to, '%Y-%m-%d')
+        except ValueError:
+            return Response({"errors":{"error": "date_from and date_to must be in format YYYY-MM-DD."}}, status=status.HTTP_400_BAD_REQUEST)
+
+        analytics = (
+            Like.objects
+            .filter(created_at__gte=date_from, created_at__lte=date_to)
+            .values('post')
+            .annotate(created_date = F('created_at__date'), likes_count=Count('id'))
+        )
+    
+        serializer = AnalyticsSerializer(analytics, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class UserActivity(ListAPIView):
+
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, user_id):
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except:
+            return Response({"errors":{"error": f"Couldn't find user with this id: {user_id}"}}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ActivitySerializer(user)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
         

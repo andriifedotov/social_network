@@ -93,6 +93,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class PostSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Post
         fields = ['id', 'user', 'title', 'content', 'created_at', 'updated_at']
@@ -100,14 +101,33 @@ class PostSerializer(serializers.ModelSerializer):
 
 
 class LikeSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Like
-        fields = ('id', 'user', 'post', 'created_at')
-        read_only_fields = ('id', 'user', 'post', 'created_at')
+        fields = ['id', 'user', 'post', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
     
     def validate(self, data):
+
+        post=self.initial_data.get('post')
+
+        request = self.context.get("request")
         
-        if Like.objects.filter(user=self.initial_data.get('user')).exists():
+        if Like.objects.filter(user=request.user, post=post).exists():
             raise serializers.ValidationError("User can like post once")
         return data
+
+
+class AnalyticsSerializer(serializers.Serializer):
+
+    created_date = serializers.DateField()
+    likes_count = serializers.IntegerField()
+    post = serializers.IntegerField()
+
+
+class ActivitySerializer(serializers.ModelSerializer):
     
+    class Meta:
+        model = User
+        fields = ['id', 'last_login', 'last_request']
+        read_only_fields = ['id', 'last_login', 'last_request']
