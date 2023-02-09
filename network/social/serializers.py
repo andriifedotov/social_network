@@ -120,9 +120,9 @@ class LikeSerializer(serializers.ModelSerializer):
 
 class AnalyticsSerializer(serializers.Serializer):
 
+    post = serializers.IntegerField()
     created_date = serializers.DateField()
     likes_count = serializers.IntegerField()
-    post = serializers.IntegerField()
 
 
 class ActivitySerializer(serializers.ModelSerializer):
